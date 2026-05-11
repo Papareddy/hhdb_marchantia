@@ -1,0 +1,56 @@
+cff-version: 1.2.0
+title: "Marchantia polymorpha HH-suite v3 database — build pipeline"
+message: "If you use this database or pipeline, please cite as below."
+type: software
+authors:
+  - given-names: Ranjith
+    family-names: Papareddy
+    email: ranjith.bbt@gmail.com
+license: MIT
+repository-code: "https://github.com/TODO/hhdb_marchantia"
+abstract: >
+  A Snakemake pipeline that builds a queryable HH-suite v3 profile database
+  from the Marchantia polymorpha Tak-1 v7.1 primary-isoform proteome,
+  using UniRef30_2023_02 as the seed for MSA generation. Implements the
+  HH-suite wiki canonical recipe with snakemake fan-out, length-tiered
+  batching, atomic per-protein writes, and structured per-protein logging
+  for production-scale runs on SLURM clusters.
+keywords:
+  - hh-suite
+  - protein homology
+  - HMM
+  - Marchantia polymorpha
+  - bioinformatics pipeline
+  - snakemake
+references:
+  - type: article
+    authors:
+      - family-names: Steinegger
+        given-names: Martin
+      - family-names: Meier
+        given-names: Markus
+      - family-names: Mirdita
+        given-names: Milot
+    title: "HH-suite3 for fast remote homology detection and deep protein annotation"
+    journal: "BMC Bioinformatics"
+    volume: 20
+    issue: 1
+    start: 473
+    year: 2019
+    doi: 10.1186/s12859-019-3019-7
+  - type: article
+    authors:
+      - family-names: Mirdita
+        given-names: Milot
+      - family-names: von den Driesch
+        given-names: Lars
+      - family-names: Galiez
+        given-names: Clovis
+    title: "Uniclust databases of clustered and deeply annotated protein sequences and alignments"
+    journal: "Nucleic Acids Research"
+    volume: 45
+    issue: D1
+    start: D170
+    end: D176
+    year: 2017
+    doi: 10.1093/nar/gkw1081
