@@ -37,12 +37,14 @@ def _tier_cfg(batch_id: str) -> dict:
     raise KeyError(f"no tier config for {name!r} (batch_id={batch_id})")
 
 def _batch_fastas(wildcards):
-    return [str(QDIR / f"{i}.fa") for i in BATCHES[wildcards.batch_id]]
+    # Force the split_proteome checkpoint to run before this DAG node resolves;
+    # then return the actual per-protein FASTA paths for this batch.
+    co = checkpoints.split_proteome.get(**wildcards).output[0]
+    return [str(Path(co) / f"{i}.fa") for i in BATCHES[wildcards.batch_id]]
 
 rule batch_msa:
     input:
         fastas = _batch_fastas,
-        queries_dir = QDIR,                       # ensures split_proteome ran
     output:
         done = "data/batches/{batch_id}.done",
         tsv  = "logs/batches/{batch_id}.summary.tsv",
