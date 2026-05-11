@@ -10,7 +10,7 @@ uniref30_release: "UniRef30_2023_02"
 # ----- mode -----
 # "smoke" → use first N proteins; "production" → all primary isoforms
 mode: "smoke"
-smoke_n: 20
+smoke_n: 10
 
 # ----- per-stage params -----
 # Smoke-test hhblits flags (fast, sanity-check the wiring; few iterations)

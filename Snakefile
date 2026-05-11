@@ -11,7 +11,7 @@ HHB   = config["hhblits_prod"] if MODE == "production" else config["hhblits_smok
 QDIR  = Path("data/queries")
 A3M   = Path("data/a3m")
 HHM   = Path("data/hhm")
-CS219 = Path("data/cs219")
+CS219 = Path("data/cs219")  # kept for backwards compat; per-protein cs219 no longer written
 DBOUT = Path("data/db")
 
 include: "workflow/rules/prep.smk"

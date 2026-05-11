@@ -43,19 +43,6 @@ rule hhmake:
         hhmake -i {input.a3m} -o {output.hhm} -M {params.m} -v 1 > {log} 2>&1
         """
 
-rule cstranslate:
-    # NB: do not change the flag set; wiki warns silent badness if any are dropped.
-    input:
-        a3m = A3M / "{id}.a3m",
-    output:
-        cs = CS219 / "{id}.cs219",
-    params:
-        flags = config["cstranslate"]["flags"],
-    log:
-        "logs/cstranslate/{id}.log",
-    conda: "../envs/hhsuite.yml"
-    shell:
-        r"""
-        export HHLIB=$CONDA_PREFIX
-        cstranslate {params.flags} -i {input.a3m} -o {output.cs} > {log} 2>&1
-        """
+# NOTE: per-protein cstranslate rule REMOVED — cstranslate has no single-file
+# mode; it always opens <prefix>.ffdata/.ffindex. We now run cstranslate ONCE
+# at pack time over the full a3m ffindex (matches wiki recipe).
