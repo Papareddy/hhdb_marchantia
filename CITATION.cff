@@ -7,7 +7,7 @@ authors:
     family-names: Papareddy
     email: ranjith.bbt@gmail.com
 license: MIT
-repository-code: "https://github.com/TODO/hhdb_marchantia"
+repository-code: "https://github.com/Papareddy/hhdb_marchantia"
 abstract: >
   A Snakemake pipeline that builds a queryable HH-suite v3 profile database
   from the Marchantia polymorpha Tak-1 v7.1 primary-isoform proteome,

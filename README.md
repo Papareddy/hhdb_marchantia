@@ -11,9 +11,13 @@ adapted to a snakemake fan-out on a SLURM cluster (bwHPC Helix), with
 length-tiered batching, atomic per-protein writes, structured TSV logs, and
 per-rule conda envs.
 
+- **Repo**: https://github.com/Papareddy/hhdb_marchantia
+- **DB tarball**: hosted on Zenodo (DOI assigned after the build completes — see [docs/DOWNSTREAM_USAGE.md](docs/DOWNSTREAM_USAGE.md))
+
 > **For users who just want to query the DB**: see the companion repo
-> `marchantia_hhdb_user/` (created post-build) — it bundles the DB tarball
-> link plus a one-line `hhsearch` wrapper, no need for this pipeline.
+> `marchantia_hhdb_user/` (created post-build) — it bundles the Zenodo DOI
+> + a `Makefile` to fetch/verify + a one-line `hhsearch` wrapper. No need
+> to clone this build pipeline.
 
 ---
 
