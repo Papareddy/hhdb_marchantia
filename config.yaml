@@ -15,14 +15,17 @@ smoke_n: 10
 # ----- production tiered batching (only used when mode == "production") -----
 # Length-tier each protein, then chunk within tier. Tiers MUST be in ascending
 # max_len order; the last tier should have a huge max_len to catch the long tail.
+# `timeout` overrides the global `per_protein_timeout` for that tier — sized
+# from empirical observation in the v1 production run (median failure was
+# 1,345 AA at 20m, so small=20m is plenty, but medium/large/giant need more).
 tiers:
-  - {name: "small",  max_len:   800, chunk_size: 30, cpus: 4, mem_mb: 16000, runtime_min: 300}   # 5h
-  - {name: "medium", max_len:  1500, chunk_size: 10, cpus: 4, mem_mb: 16000, runtime_min: 360}   # 6h
-  - {name: "large",  max_len:  3000, chunk_size:  4, cpus: 4, mem_mb: 24000, runtime_min: 360}   # 6h
-  - {name: "giant",  max_len: 1000000, chunk_size: 1, cpus: 8, mem_mb: 32000, runtime_min: 240} # 4h per protein
+  - {name: "small",  max_len:   800, chunk_size: 30, cpus: 4, mem_mb: 16000, runtime_min: 300, timeout: "20m"}   # 5h batch
+  - {name: "medium", max_len:  1500, chunk_size: 10, cpus: 4, mem_mb: 16000, runtime_min: 480, timeout: "45m"}   # 8h batch
+  - {name: "large",  max_len:  3000, chunk_size:  4, cpus: 4, mem_mb: 24000, runtime_min: 480, timeout: "90m"}   # 8h batch
+  - {name: "giant",  max_len: 1000000, chunk_size: 1, cpus: 8, mem_mb: 32000, runtime_min: 240, timeout: "180m"} # 4h batch (1 protein)
 
-# Per-protein wallclock cap inside a batch (`timeout` wrapper around hhblits).
-# Stuck proteins are killed at this limit and logged to data/batches/{batch}.failed.
+# Global fallback if a tier doesn't define `timeout`. Should normally not be hit
+# since every tier in `tiers:` above sets its own.
 per_protein_timeout: "20m"
 
 # ----- per-stage params -----

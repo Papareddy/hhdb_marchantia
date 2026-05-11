@@ -14,6 +14,11 @@ HHM   = Path("data/hhm")
 CS219 = Path("data/cs219")  # kept for backwards compat; per-protein cs219 no longer written
 DBOUT = Path("data/db")
 
+# Light rules that should run on the driver host (no SLURM queue wait).
+# split_proteome is a 30s FASTA write — queuing it would waste 5-15 min minimum.
+# summary + run_report aggregate small TSVs/markdown — likewise.
+localrules: split_proteome, summary, run_report, all
+
 include: "workflow/rules/prep.smk"
 include: "workflow/rules/msa.smk"        # per-protein hhblits/hhmake (used by smoke + as fallback)
 if MODE == "production":

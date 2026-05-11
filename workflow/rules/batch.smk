@@ -61,7 +61,8 @@ rule batch_msa:
         iters       = config["hhblits_prod"]["iters"],
         evalue      = config["hhblits_prod"]["evalue"],
         hhb_extra   = config["hhblits_prod"]["extra"],
-        per_timeout = config["per_protein_timeout"],
+        # Tier-aware timeout: each tier may override the global fallback.
+        per_timeout = lambda wc: _tier_cfg(wc.batch_id).get("timeout", config["per_protein_timeout"]),
         hhmake_m    = config["hhmake"]["match_assign"],
     conda: "../envs/hhsuite.yml"
     shell:
