@@ -28,9 +28,12 @@ hhblits_prod:
   cpu: 4
   extra: "-cov 0 -qid 0 -maxfilt 100000 -diff inf -id 100"
 
-# hhmake — wiki uses default (-M first); -M first anchors columns to the seed
+# hhmake — empirically only -M a3m works on hhblits 3.3.0 output; -M first/50/30
+# all hit "Compress" error in hhalignment.cpp (sequences "do not all have the
+# same number of columns") on most A3Ms. -M a3m trusts the A3M's own match-
+# state encoding (uppercase=match, lowercase=insert) and bypasses recomputation.
 hhmake:
-  match_assign: "first"   # 'first' or an int percentage; wiki/canonical = first
+  match_assign: "a3m"
 
 # cstranslate — wiki-mandated flags. Do NOT remove any of these.
 cstranslate:
