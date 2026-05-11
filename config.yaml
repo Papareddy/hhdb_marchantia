@@ -3,9 +3,9 @@ proteome_fa: "data/proteome/MpTak_v7.1.protein.primary.fa"
 db_name: "marchantia_v7.1"
 
 # UniRef30 prefix (the path stem the hhblits -d flag wants;
-# e.g. data/reference/UniRef30_2023_02/UniRef30_2023_02 — without _a3m.ffdata suffix)
-uniref30_prefix: "data/reference/UniRef30_2023_02/UniRef30_2023_02"
-uniref30_release: "UniRef30_2023_02"  # update once we pick the latest tag at download
+# tarball extracts flat into data/reference/, so prefix = .../UniRef30_2023_02)
+uniref30_prefix: "data/reference/UniRef30_2023_02"
+uniref30_release: "UniRef30_2023_02"
 
 # ----- mode -----
 # "smoke" → use first N proteins; "production" → all primary isoforms
