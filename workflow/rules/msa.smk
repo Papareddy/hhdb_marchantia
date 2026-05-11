@@ -18,7 +18,6 @@ rule hhblits:
     resources:
         mem_mb  = lambda wc: config["slurm"]["hhblits_mem_mb"],
         runtime = lambda wc: config["slurm"]["hhblits_runtime_min"],
-    group: "msa"
     conda: "../envs/hhsuite.yml"
     shell:
         r"""
@@ -37,7 +36,6 @@ rule hhmake:
         m = config["hhmake"]["match_assign"],
     log:
         "logs/hhmake/{id}.log",
-    group: "msa"
     conda: "../envs/hhsuite.yml"
     shell:
         r"""
@@ -55,7 +53,6 @@ rule cstranslate:
         flags = config["cstranslate"]["flags"],
     log:
         "logs/cstranslate/{id}.log",
-    group: "msa"
     conda: "../envs/hhsuite.yml"
     shell:
         r"""

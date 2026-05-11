@@ -10,9 +10,10 @@ latency-wait: 30
 use-conda: true                # per-rule hhsuite runtime env (workflow/envs/hhsuite.yml)
 printshellcmds: true
 
-# Group msa rules so each batch runs in one SLURM job (set batch_size in config.yaml)
-group-components:
-  - msa=50
+# NOTE: snakemake 'group:' summed resource asks across all rules in the
+# group, producing a single submission with cpus_per_task=160, mem=312G —
+# instantly rejected by cpu-single. Removed group entirely; each rule gets
+# its own SLURM job. For ~54k production jobs we'll cap concurrency via --jobs.
 
 default-resources:
   - slurm_account=bw25c013
