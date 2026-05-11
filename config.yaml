@@ -12,6 +12,19 @@ uniref30_release: "UniRef30_2023_02"
 mode: "smoke"
 smoke_n: 10
 
+# ----- production tiered batching (only used when mode == "production") -----
+# Length-tier each protein, then chunk within tier. Tiers MUST be in ascending
+# max_len order; the last tier should have a huge max_len to catch the long tail.
+tiers:
+  - {name: "small",  max_len:   800, chunk_size: 30, cpus: 4, mem_mb: 16000, runtime_min: 300}   # 5h
+  - {name: "medium", max_len:  1500, chunk_size: 10, cpus: 4, mem_mb: 16000, runtime_min: 360}   # 6h
+  - {name: "large",  max_len:  3000, chunk_size:  4, cpus: 4, mem_mb: 24000, runtime_min: 360}   # 6h
+  - {name: "giant",  max_len: 1000000, chunk_size: 1, cpus: 8, mem_mb: 32000, runtime_min: 240} # 4h per protein
+
+# Per-protein wallclock cap inside a batch (`timeout` wrapper around hhblits).
+# Stuck proteins are killed at this limit and logged to data/batches/{batch}.failed.
+per_protein_timeout: "20m"
+
 # ----- per-stage params -----
 # Smoke-test hhblits flags (fast, sanity-check the wiring; few iterations)
 hhblits_smoke:

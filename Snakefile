@@ -15,7 +15,9 @@ CS219 = Path("data/cs219")  # kept for backwards compat; per-protein cs219 no lo
 DBOUT = Path("data/db")
 
 include: "workflow/rules/prep.smk"
-include: "workflow/rules/msa.smk"
+include: "workflow/rules/msa.smk"        # per-protein hhblits/hhmake (used by smoke + as fallback)
+if MODE == "production":
+    include: "workflow/rules/batch.smk"  # tiered batch_msa wrapper (production only)
 include: "workflow/rules/pack.smk"
 
 # Top-level target: the six ffindex files (ordered) + integrity check stamp
@@ -29,3 +31,4 @@ rule all:
         DBOUT / f"{DB}_cs219.ffindex",
         f"results/validation/{DB}.integrity.ok",
         f"results/validation/{DB}.summary.tsv",
+        *(["results/run_report.md", "results/failed_proteins.tsv"] if MODE == "production" else []),

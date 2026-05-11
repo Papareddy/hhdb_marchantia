@@ -1,17 +1,25 @@
-# Stage 5: pack a3m + hhm into ffindex; cstranslate the a3m ffindex into cs219
-# (cstranslate has no single-file mode — it always operates on a ffindex).
+# Stage 5: pack a3m + hhm into ffindex; cstranslate the a3m ffindex into cs219.
+# (cstranslate has no single-file mode — always operates on a ffindex.)
 # Then size-sort cs219 desc and apply same ordering to a3m + hhm (wiki recipe).
+#
+# In production mode pack depends on per-batch sentinels (not per-protein files);
+# the shell then INTERSECTS available {a3m,hhm} files so a protein that failed
+# only one stage is excluded entirely. This keeps integrity_check passing
+# (equal counts across all 3 indices) even with N permanent failures.
 
 def _all_a3m(wildcards):  return [A3M / f"{i}.a3m" for i in all_ids(wildcards)]
 def _all_hhm(wildcards):  return [HHM / f"{i}.hhm" for i in all_ids(wildcards)]
 
+def _msa_completion(wildcards):
+    """In production: depend on every batch sentinel (batch.smk loads BATCHES into globals).
+    In smoke: depend on per-protein outputs (legacy DAG)."""
+    if MODE == "production":
+        return [f"data/batches/{bid}.done" for bid in globals()["BATCHES"]]
+    return _all_a3m(wildcards) + _all_hhm(wildcards)
+
 rule pack_ffindex:
-    # ffindex_build keys on the literal filename. We need identical keys across
-    # all three indices, so we stage symlinks named after the bare {id} (no ext).
-    # cs219 is built directly by cstranslate from the a3m ffindex (wiki recipe).
     input:
-        a3m = _all_a3m,
-        hhm = _all_hhm,
+        msa_done = _msa_completion,
     output:
         a3m_d = DBOUT / f"{DB}_a3m.ffdata",
         a3m_i = DBOUT / f"{DB}_a3m.ffindex",
@@ -24,24 +32,37 @@ rule pack_ffindex:
     log:
         "logs/pack/pack.log",
     threads: 4
-    resources: mem_mb=8000, runtime=60
+    resources: mem_mb=16000, runtime=240
     conda: "../envs/hhsuite.yml"
     shell:
         r"""
         set -euo pipefail
         export HHLIB=$CONDA_PREFIX
         mkdir -p {DBOUT} _stage/a3m _stage/hhm
+        : > {log}
+
+        # Intersection: only include proteins where BOTH a3m and hhm exist (>0 bytes).
+        # Excludes proteins that permanently failed at either stage.
+        find {A3M} -name '*.a3m' -size +0 -printf '%f\n' | sed 's/\.a3m$//' | sort -u > _stage/a3m_ids
+        find {HHM} -name '*.hhm' -size +0 -printf '%f\n' | sed 's/\.hhm$//' | sort -u > _stage/hhm_ids
+        comm -12 _stage/a3m_ids _stage/hhm_ids > _stage/both_ids
+        n_a3m_only=$(comm -23 _stage/a3m_ids _stage/hhm_ids | wc -l)
+        n_hhm_only=$(comm -13 _stage/a3m_ids _stage/hhm_ids | wc -l)
+        n_both=$(wc -l < _stage/both_ids)
+        echo "[pack] a3m_only=$n_a3m_only  hhm_only=$n_hhm_only  both=$n_both" | tee -a {log}
+        [ "$n_both" -gt 0 ] || {{ echo "FAIL: zero proteins have both a3m and hhm"; exit 1; }}
 
         # stage symlinks renamed to bare ID (key) so all 3 indices share keys
-        for f in {A3M}/*.a3m; do ln -sf "$PWD/$f" _stage/a3m/$(basename "$f" .a3m); done
-        for f in {HHM}/*.hhm; do ln -sf "$PWD/$f" _stage/hhm/$(basename "$f" .hhm); done
+        while read id; do
+          ln -sf "$PWD/{A3M}/${{id}}.a3m" _stage/a3m/${{id}}
+          ln -sf "$PWD/{HHM}/${{id}}.hhm" _stage/hhm/${{id}}
+        done < _stage/both_ids
 
         # build a3m + hhm ffindex
-        ffindex_build -s {output.a3m_d} {output.a3m_i} _stage/a3m 2> {log}
+        ffindex_build -s {output.a3m_d} {output.a3m_i} _stage/a3m 2>>{log}
         ffindex_build -s {output.hhm_d} {output.hhm_i} _stage/hhm 2>>{log}
 
-        # cstranslate over the a3m ffindex -> cs219 ffindex (wiki canonical recipe)
-        # NOTE: -i takes the prefix without .ffdata; output is the cs219 prefix.
+        # cstranslate over the a3m ffindex -> cs219 ffindex (wiki canonical)
         cstranslate {params.cs_flags} -i {DBOUT}/{DB}_a3m -o {DBOUT}/{DB}_cs219 2>>{log}
 
         # size-sort cs219 desc -> sorting.dat -> reorder cs219 + a3m + hhm with same order
@@ -84,13 +105,14 @@ rule integrity_check:
 rule summary:
     input:
         ok = "results/validation/" + DB + ".integrity.ok",
-        a3m_files = _all_a3m,
     output:
         tsv = "results/validation/" + DB + ".summary.tsv",
     run:
-        import statistics
+        import statistics, glob
+        from pathlib import Path as _P
+        a3m_files = sorted(glob.glob(str(A3M / "*.a3m")))
         depths, lens = [], []
-        for p in input.a3m_files:
+        for p in a3m_files:
             with open(p) as fh:
                 lines = [l.rstrip() for l in fh if l and not l.startswith("#")]
             seqs = [l for l in lines if not l.startswith(">")]
@@ -98,7 +120,53 @@ rule summary:
             if seqs: lens.append(len(seqs[0]))
         with open(output.tsv, "w") as o:
             o.write("metric\tvalue\n")
-            o.write(f"N_proteins\t{len(input.a3m_files)}\n")
-            o.write(f"mean_msa_depth\t{statistics.mean(depths):.1f}\n")
-            o.write(f"median_msa_depth\t{statistics.median(depths):.1f}\n")
-            o.write(f"mean_query_len\t{statistics.mean(lens):.1f}\n")
+            o.write(f"N_proteins\t{len(a3m_files)}\n")
+            if depths:
+                o.write(f"mean_msa_depth\t{statistics.mean(depths):.1f}\n")
+                o.write(f"median_msa_depth\t{statistics.median(depths):.1f}\n")
+            if lens:
+                o.write(f"mean_query_len\t{statistics.mean(lens):.1f}\n")
+
+rule run_report:
+    """Aggregate per-batch summary TSVs + failed lists into results/run_report.md."""
+    input:
+        ok = "results/validation/" + DB + ".integrity.ok",
+    output:
+        md = "results/run_report.md",
+        failed_tsv = "results/failed_proteins.tsv",
+    run:
+        import glob, datetime, statistics
+        from collections import Counter, defaultdict
+        all_rows = []
+        for tsv in sorted(glob.glob("logs/batches/*.summary.tsv")):
+            with open(tsv) as fh:
+                next(fh, None)
+                for ln in fh:
+                    parts = ln.rstrip("\n").split("\t")
+                    if len(parts) >= 8:
+                        all_rows.append(parts)
+        statuses = Counter(r[2] for r in all_rows)
+        reasons  = Counter(r[7] for r in all_rows if r[2] == "FAILED")
+        wall_by_status = defaultdict(list)
+        for r in all_rows:
+            try: wall_by_status[r[2]].append(int(r[5]))
+            except (ValueError, IndexError): pass
+        with open(output.md, "w") as o:
+            o.write(f"# Production run report\n\n")
+            o.write(f"Generated: {datetime.datetime.now().isoformat()}\n\n")
+            o.write(f"## Per-protein status\n\n")
+            for s, n in statuses.most_common():
+                o.write(f"- **{s}**: {n}\n")
+            o.write(f"\n## Failure reasons (FAILED only)\n\n")
+            for r, n in reasons.most_common():
+                o.write(f"- {r}: {n}\n")
+            o.write(f"\n## Walltime stats per status (seconds)\n\n")
+            o.write("| status | n | mean | median | max |\n|---|---|---|---|---|\n")
+            for s, ws in wall_by_status.items():
+                if ws:
+                    o.write(f"| {s} | {len(ws)} | {statistics.mean(ws):.0f} | {statistics.median(ws):.0f} | {max(ws)} |\n")
+        with open(output.failed_tsv, "w") as o:
+            o.write("protein_id\tlength_aa\thhblits_sec\thhmake_sec\twall_sec\texit\treason\n")
+            for r in all_rows:
+                if r[2] == "FAILED":
+                    o.write("\t".join([r[0], r[1], r[3], r[4], r[5], r[6], r[7]]) + "\n")
