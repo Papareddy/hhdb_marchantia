@@ -1,0 +1,13 @@
+data/reference/
+data/queries/
+data/a3m/
+data/hhm/
+data/cs219/
+data/db/
+data/proteome/*.fa
+logs/
+results/
+.snakemake/
+_stage/
+*.tar.gz
+*.tar

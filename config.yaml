@@ -1,0 +1,50 @@
+# ----- inputs -----
+proteome_fa: "data/proteome/MpTak_v7.1.protein.primary.fa"
+db_name: "marchantia_v7.1"
+
+# UniRef30 prefix (the path stem the hhblits -d flag wants;
+# e.g. data/reference/UniRef30_2023_02/UniRef30_2023_02 — without _a3m.ffdata suffix)
+uniref30_prefix: "data/reference/UniRef30_2023_02/UniRef30_2023_02"
+uniref30_release: "UniRef30_2023_02"  # update once we pick the latest tag at download
+
+# ----- mode -----
+# "smoke" → use first N proteins; "production" → all primary isoforms
+mode: "smoke"
+smoke_n: 20
+
+# ----- per-stage params -----
+# Smoke-test hhblits flags (fast, sanity-check the wiring; few iterations)
+hhblits_smoke:
+  iters: 1
+  evalue: 1.0e-3
+  cpu: 4
+  extra: "-cov 0 -qid 0"
+
+# Production hhblits flags — wiki + user-guide build-time set
+# (broad, unfiltered MSAs; filtering happens at search time)
+hhblits_prod:
+  iters: 2
+  evalue: 1.0e-3
+  cpu: 4
+  extra: "-cov 0 -qid 0 -maxfilt 100000 -diff inf -id 100"
+
+# hhmake — wiki uses default (-M first); -M first anchors columns to the seed
+hhmake:
+  match_assign: "first"   # 'first' or an int percentage; wiki/canonical = first
+
+# cstranslate — wiki-mandated flags. Do NOT remove any of these.
+cstranslate:
+  flags: "-f -x 0.3 -c 4 -I a3m"
+
+# ----- batching -----
+# proteins per SLURM array task (set to 1 for true per-protein; 50–100 for prod)
+batch_size: 50
+
+# ----- SLURM defaults (used by profiles/slurm/config.yaml) -----
+slurm:
+  account: "bw25c013"
+  partition_short: "cpu-single"   # confirm with `sinfo -s` before launch
+  partition_long:  "cpu-single"
+  hhblits_mem_mb: 16000
+  hhblits_runtime_min: 60
+  hhblits_cpus: 4

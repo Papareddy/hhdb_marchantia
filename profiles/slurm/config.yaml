@@ -1,0 +1,35 @@
+# Snakemake 8 SLURM executor profile
+# Run with:  snakemake --profile profiles/slurm  -n   (dry-run first)
+
+executor: slurm
+jobs: 500                      # max concurrent SLURM jobs
+restart-times: 1
+keep-going: true
+rerun-incomplete: true
+latency-wait: 30
+use-conda: false               # we activate env in the submitting shell
+printshellcmds: true
+
+# Group msa rules so each batch runs in one SLURM job (set batch_size in config.yaml)
+group-components:
+  - msa=50
+
+default-resources:
+  - slurm_account=bw25c013
+  - slurm_partition=cpu-single  # confirm with `sinfo -s`; placeholder
+  - mem_mb=8000
+  - runtime=60
+  - cpus_per_task=4
+  - tmpdir="$TMPDIR"
+
+set-resources:
+  hhblits:
+    slurm_partition: cpu-single
+    mem_mb: 16000
+    runtime: 60
+    cpus_per_task: 4
+  pack_ffindex:
+    slurm_partition: cpu-single
+    mem_mb: 16000
+    runtime: 240
+    cpus_per_task: 4
