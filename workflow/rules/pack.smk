@@ -24,6 +24,7 @@ rule pack_ffindex:
         "logs/pack/ffindex_build.log",
     threads: 4
     resources: mem_mb=8000, runtime=60
+    conda: "../envs/hhsuite.yml"
     shell:
         r"""
         set -euo pipefail
@@ -60,6 +61,7 @@ rule integrity_check:
         ok = "results/validation/" + DB + ".integrity.ok",
     log:
         "logs/pack/integrity.log",
+    conda: "../envs/hhsuite.yml"
     shell:
         r"""
         set -euo pipefail

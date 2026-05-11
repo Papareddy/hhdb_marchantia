@@ -7,7 +7,8 @@ restart-times: 1
 keep-going: true
 rerun-incomplete: true
 latency-wait: 30
-use-conda: false               # we activate env in the submitting shell
+use-conda: true                # per-rule hhsuite runtime env (workflow/envs/hhsuite.yml)
+conda-frontend: mamba
 printshellcmds: true
 
 # Group msa rules so each batch runs in one SLURM job (set batch_size in config.yaml)

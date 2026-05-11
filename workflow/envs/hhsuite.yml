@@ -1,0 +1,13 @@
+# Runtime env for hh-suite + helpers.
+# Loaded per-rule by snakemake --use-conda (because hhsuite=3.3.0 only has
+# py3.7-3.9 builds and the snakemake-slurm plugin needs py>=3.11).
+name: hhsuite_runtime
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.9
+  - hhsuite=3.3.0
+  - mmseqs2
+  - seqkit>=2.8
+  - pigz

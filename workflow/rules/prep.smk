@@ -11,6 +11,7 @@ checkpoint split_proteome:
         n    = config.get("smoke_n", 20),
     log:
         "logs/prep/split_proteome.log",
+    conda: "../envs/hhsuite.yml"
     shell:
         r"""
         set -euo pipefail

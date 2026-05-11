@@ -10,8 +10,11 @@ Stages: split → hhblits (vs UniRef30) → hhmake → cstranslate → ffindex p
 
 ```bash
 module load devel/miniforge/24.9.2
-mamba env create -f environment.yml          # one-time
+mamba env create -f environment.yml          # one-time orchestrator env
 conda activate hhsuite_marchantia
+
+# first run will auto-build the per-rule hhsuite runtime env
+# (workflow/envs/hhsuite.yml) under .snakemake/conda/
 
 # smoke test (default: 20 proteins)
 snakemake --profile profiles/slurm -n         # dry-run
@@ -19,6 +22,12 @@ snakemake --profile profiles/slurm
 
 # production: edit config.yaml -> mode: "production", then re-run
 ```
+
+## Why two conda envs
+
+`hhsuite=3.3.0` only ships py3.7-3.9 builds; `snakemake-executor-plugin-slurm>=0.11`
+needs py>=3.11. So the orchestrator (snakemake) and the runtime (hhsuite) live in
+separate envs, wired via snakemake's per-rule `conda:` directive.
 
 ## Layout
 

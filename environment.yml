@@ -1,14 +1,13 @@
+# Orchestrator env: snakemake + slurm executor only.
+# The hh-suite runtime tools live in workflow/envs/hhsuite.yml,
+# loaded per-rule via snakemake --use-conda.
 name: hhsuite_marchantia
 channels:
   - conda-forge
   - bioconda
 dependencies:
   - python=3.11
-  - hh-suite=3.3.0
   - snakemake-minimal>=8.20
   - snakemake-executor-plugin-slurm>=0.11
-  - mmseqs2=15.6f452
-  - seqkit>=2.8
-  - pigz
-  - aria2
+  - mamba
   - pyyaml
