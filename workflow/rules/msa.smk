@@ -22,6 +22,7 @@ rule hhblits:
     conda: "../envs/hhsuite.yml"
     shell:
         r"""
+        export HHLIB=$CONDA_PREFIX
         hhblits -i {input.fa} -d {params.db} -oa3m {output.a3m} \
                 -n {params.iters} -e {params.evalue} -cpu {params.cpu} \
                 {params.extra} -v 1 > {log} 2>&1
@@ -40,6 +41,7 @@ rule hhmake:
     conda: "../envs/hhsuite.yml"
     shell:
         r"""
+        export HHLIB=$CONDA_PREFIX
         hhmake -i {input.a3m} -o {output.hhm} -M {params.m} -v 1 > {log} 2>&1
         """
 
@@ -57,5 +59,6 @@ rule cstranslate:
     conda: "../envs/hhsuite.yml"
     shell:
         r"""
+        export HHLIB=$CONDA_PREFIX
         cstranslate {params.flags} -i {input.a3m} -o {output.cs} > {log} 2>&1
         """

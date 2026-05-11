@@ -70,8 +70,10 @@ rule integrity_check:
         n_cs=$(wc -l  < {input.cs_i})
         echo "a3m=$n_a3m hhm=$n_hhm cs219=$n_cs" | tee {log}
         [ "$n_a3m" = "$n_hhm" ] && [ "$n_hhm" = "$n_cs" ] || {{ echo "FAIL: index lengths differ"; exit 1; }}
-        # wiki-recommended structural check (best effort; tool may need PYTHONPATH set):
-        hhsuitedb.py -o {DBOUT}/{DB} --cpu 1 >> {log} 2>&1 || echo "WARN: hhsuitedb.py not available or returned non-zero — review {log}"
+        # wiki-recommended structural check (best effort; bioconda ships the script under $CONDA_PREFIX/scripts):
+        export HHLIB=$CONDA_PREFIX
+        python "$CONDA_PREFIX/scripts/hhsuitedb.py" -o {DBOUT}/{DB} --cpu 1 >> {log} 2>&1 \
+            || echo "WARN: hhsuitedb.py returned non-zero — review {log}"
         touch {output.ok}
         """
 
