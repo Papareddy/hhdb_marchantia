@@ -19,10 +19,10 @@ smoke_n: 10
 # from empirical observation in the v1 production run (median failure was
 # 1,345 AA at 20m, so small=20m is plenty, but medium/large/giant need more).
 tiers:
-  - {name: "small",  max_len:   800, chunk_size: 30, cpus: 4, mem_mb: 16000, runtime_min: 300, timeout: "20m"}   # 5h batch
-  - {name: "medium", max_len:  1500, chunk_size: 10, cpus: 4, mem_mb: 16000, runtime_min: 480, timeout: "45m"}   # 8h batch
-  - {name: "large",  max_len:  3000, chunk_size:  4, cpus: 4, mem_mb: 24000, runtime_min: 480, timeout: "90m"}   # 8h batch
-  - {name: "giant",  max_len: 1000000, chunk_size: 1, cpus: 8, mem_mb: 32000, runtime_min: 240, timeout: "180m"} # 4h batch (1 protein)
+  - {name: "small",  max_len:   800, chunk_size: 30, cpus: 4, mem_mb: 16000, runtime_min: 300, timeout:  "30m"}  # 5h batch
+  - {name: "medium", max_len:  1500, chunk_size: 10, cpus: 4, mem_mb: 24000, runtime_min: 720, timeout:  "60m"}  # 12h batch
+  - {name: "large",  max_len:  3000, chunk_size:  4, cpus: 4, mem_mb: 48000, runtime_min: 480, timeout:  "90m"}  # 8h batch
+  - {name: "giant",  max_len: 1000000, chunk_size: 1, cpus: 8, mem_mb: 64000, runtime_min: 240, timeout: "180m"} # 4h batch (1 protein)
 
 # Global fallback if a tier doesn't define `timeout`. Should normally not be hit
 # since every tier in `tiers:` above sets its own.
