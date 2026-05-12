@@ -12,7 +12,9 @@ length-tiered batching, atomic per-protein writes, structured TSV logs, and
 per-rule conda envs.
 
 - **Repo**: https://github.com/Papareddy/hhdb_marchantia
+- **Companion (end-user)**: https://github.com/Papareddy/marchantia_hhdb_user
 - **DB tarball**: hosted on Zenodo (DOI assigned after the build completes — see [docs/DOWNSTREAM_USAGE.md](docs/DOWNSTREAM_USAGE.md))
+- **Picking up mid-flight or from a fresh machine?** → [docs/HANDOFF.md](docs/HANDOFF.md)
 
 > **For users who just want to query the DB**: see the companion repo
 > `marchantia_hhdb_user/` (created post-build) — it bundles the Zenodo DOI
