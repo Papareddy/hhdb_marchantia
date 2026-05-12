@@ -32,50 +32,60 @@ rule pack_ffindex:
     log:
         "logs/pack/pack.log",
     threads: 4
-    resources: mem_mb=16000, runtime=240
+    resources: mem_mb=32000, runtime=480    # bumped: 32G mem, 8h walltime
     conda: "../envs/hhsuite.yml"
     shell:
         r"""
-        set -euo pipefail
+        set -uo pipefail
         export HHLIB=$CONDA_PREFIX
-        mkdir -p {DBOUT} _stage/a3m _stage/hhm
-        : > {log}
+        mkdir -p {DBOUT} _stage/a3m _stage/hhm logs/pack
+        # Per-attempt log file so earlier attempts' errors aren't clobbered.
+        ATTEMPT_LOG=logs/pack/pack.$(date +%Y%m%dT%H%M%S).log
+        ln -sf "$(basename $ATTEMPT_LOG)" {log}
+        exec > >(tee -a "$ATTEMPT_LOG") 2>&1
+        echo "[pack] start $(date -Is) host=$(hostname) PWD=$PWD"
+        df -h . | tee -a "$ATTEMPT_LOG"
 
         # Intersection: only include proteins where BOTH a3m and hhm exist (>0 bytes).
-        # Excludes proteins that permanently failed at either stage.
         find {A3M} -name '*.a3m' -size +0 -printf '%f\n' | sed 's/\.a3m$//' | sort -u > _stage/a3m_ids
         find {HHM} -name '*.hhm' -size +0 -printf '%f\n' | sed 's/\.hhm$//' | sort -u > _stage/hhm_ids
         comm -12 _stage/a3m_ids _stage/hhm_ids > _stage/both_ids
         n_a3m_only=$(comm -23 _stage/a3m_ids _stage/hhm_ids | wc -l)
         n_hhm_only=$(comm -13 _stage/a3m_ids _stage/hhm_ids | wc -l)
         n_both=$(wc -l < _stage/both_ids)
-        echo "[pack] a3m_only=$n_a3m_only  hhm_only=$n_hhm_only  both=$n_both" | tee -a {log}
-        [ "$n_both" -gt 0 ] || {{ echo "FAIL: zero proteins have both a3m and hhm"; exit 1; }}
+        echo "[pack] a3m_only=$n_a3m_only  hhm_only=$n_hhm_only  both=$n_both"
+        [ "$n_both" -gt 0 ] || {{ echo "[pack] FAIL: zero proteins have both a3m and hhm"; exit 1; }}
 
         # stage symlinks renamed to bare ID (key) so all 3 indices share keys
+        echo "[pack] $(date -Is) staging $n_both symlinks..."
         while read id; do
           ln -sf "$PWD/{A3M}/${{id}}.a3m" _stage/a3m/${{id}}
           ln -sf "$PWD/{HHM}/${{id}}.hhm" _stage/hhm/${{id}}
         done < _stage/both_ids
+        echo "[pack] $(date -Is) staging done."
 
-        # build a3m + hhm ffindex
-        ffindex_build -s {output.a3m_d} {output.a3m_i} _stage/a3m 2>>{log}
-        ffindex_build -s {output.hhm_d} {output.hhm_i} _stage/hhm 2>>{log}
+        echo "[pack] $(date -Is) ffindex_build a3m..."
+        ffindex_build -s {output.a3m_d} {output.a3m_i} _stage/a3m
+        echo "[pack] $(date -Is) ffindex_build hhm..."
+        ffindex_build -s {output.hhm_d} {output.hhm_i} _stage/hhm
 
-        # cstranslate over the a3m ffindex -> cs219 ffindex (wiki canonical)
-        cstranslate {params.cs_flags} -i {DBOUT}/{DB}_a3m -o {DBOUT}/{DB}_cs219 2>>{log}
+        echo "[pack] $(date -Is) cstranslate over a3m ffindex -> cs219 ffindex..."
+        cstranslate {params.cs_flags} -i {DBOUT}/{DB}_a3m -o {DBOUT}/{DB}_cs219
+        echo "[pack] $(date -Is) cstranslate done. cs219 size:"
+        ls -lh {DBOUT}/{DB}_cs219.* | tee -a "$ATTEMPT_LOG"
 
-        # size-sort cs219 desc -> sorting.dat -> reorder cs219 + a3m + hhm with same order
+        echo "[pack] $(date -Is) size-sort cs219 + reorder all three..."
         sort -k3 -n -r {output.cs_i} | cut -f1 > {DBOUT}/sorting.dat
         for triple in cs219 a3m hhm; do
           d={DBOUT}/{DB}_${{triple}}.ffdata
           i={DBOUT}/{DB}_${{triple}}.ffindex
-          ffindex_order {DBOUT}/sorting.dat $d $i ${{d}}.ord ${{i}}.ord 2>>{log}
+          ffindex_order {DBOUT}/sorting.dat $d $i ${{d}}.ord ${{i}}.ord
           mv ${{d}}.ord $d
           mv ${{i}}.ord $i
         done
 
         rm -rf _stage
+        echo "[pack] $(date -Is) DONE."
         """
 
 rule integrity_check:
