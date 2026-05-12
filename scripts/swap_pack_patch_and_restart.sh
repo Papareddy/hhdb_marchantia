@@ -31,11 +31,11 @@ rm -rf data/db/*
 rm -f results/validation/marchantia_v7.1.integrity.ok
 rm -f results/validation/marchantia_v7.1.summary.tsv
 
-# 4) fetch patched pack.smk + resources from origin/main
-echo "[swap] fetching patched pack.smk from origin/main"
+# 4) fetch patched pack.smk + profile from origin/main
+echo "[swap] fetching patched pack.smk + profile from origin/main"
 git remote add origin https://github.com/Papareddy/hhdb_marchantia.git 2>/dev/null || true
 git fetch origin main
-git checkout origin/main -- workflow/rules/pack.smk
+git checkout origin/main -- workflow/rules/pack.smk profiles/slurm/config.yaml
 
 # 5) restart driver
 module load devel/miniforge/24.9.2
