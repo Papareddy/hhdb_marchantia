@@ -37,9 +37,9 @@ set-resources:
     cpus_per_task: 1
   pack_ffindex:
     slurm_partition: cpu-single
-    mem_mb: 32000            # bumped: cstranslate over 184GB a3m ffindex can spike
-    runtime: 480             # bumped: 8h headroom
-    cpus_per_task: 4
+    mem_mb: 32000            # cstranslate over 184GB a3m ffindex spikes here
+    runtime: 960             # 16h: cstranslate of 17,567 entries at ~30/min = ~10h
+    cpus_per_task: 8         # cstranslate is OpenMP; -c 8 in flags matches
   integrity_check:
     slurm_partition: cpu-single
     mem_mb: 4000

@@ -49,8 +49,10 @@ hhmake:
   match_assign: "a3m"
 
 # cstranslate — wiki-mandated flags. Do NOT remove any of these.
+# -c is OpenMP thread count; bumped to 8 to speed up the 17,567-entry pass
+# (matches profile's cpus_per_task=8 for pack_ffindex).
 cstranslate:
-  flags: "-f -x 0.3 -c 4 -I a3m"
+  flags: "-f -x 0.3 -c 8 -I a3m"
 
 # ----- batching -----
 # proteins per SLURM array task (set to 1 for true per-protein; 50–100 for prod)
