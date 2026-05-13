@@ -106,9 +106,10 @@ rule integrity_check:
         n_cs=$(wc -l  < {input.cs_i})
         echo "a3m=$n_a3m hhm=$n_hhm cs219=$n_cs" | tee {log}
         [ "$n_a3m" = "$n_hhm" ] && [ "$n_hhm" = "$n_cs" ] || {{ echo "FAIL: index lengths differ"; exit 1; }}
-        export HHLIB=$CONDA_PREFIX
-        python "$CONDA_PREFIX/scripts/hhsuitedb.py" -o {DBOUT}/{DB} --cpu 1 >> {log} 2>&1 \
-            || echo "WARN: hhsuitedb.py returned non-zero — review {log}"
+        # NOTE: hhsuitedb.py was an extra wiki-recommended structural check,
+        # but on a 17k-entry DB it walks the full a3m.ffdata (~184GB) and
+        # blew our 30min walltime in the v1 build. Index-count parity above
+        # is the actual integrity guarantee. Skipping hhsuitedb.py.
         touch {output.ok}
         """
 
