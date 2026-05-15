@@ -1,5 +1,7 @@
 # Marchantia polymorpha Tak-1 v7.1 — custom HH-suite v3 database
 
+**Status: production-ready (May 2026).** 18,007 / 18,007 protein profiles built (**100 % proteome coverage**). DB is live on bwHPC SDS for Dagdas-lab users; Zenodo upload pending.
+
 A reproducible Snakemake pipeline that builds a queryable HH-suite v3 profile
 database from the *Marchantia polymorpha* Tak-1 v7.1 primary-isoform proteome
 (`MpTak_v7.1.protein.primary.fa`, 18,007 proteins). MSAs are seeded against
@@ -12,14 +14,14 @@ length-tiered batching, atomic per-protein writes, structured TSV logs, and
 per-rule conda envs.
 
 - **Repo**: https://github.com/Papareddy/hhdb_marchantia
-- **Companion (end-user)**: https://github.com/Papareddy/marchantia_hhdb_user
-- **DB tarball**: hosted on Zenodo (DOI assigned after the build completes — see [docs/DOWNSTREAM_USAGE.md](docs/DOWNSTREAM_USAGE.md))
-- **Picking up mid-flight or from a fresh machine?** → [docs/HANDOFF.md](docs/HANDOFF.md)
+- **Companion (end-user query wrapper)**: https://github.com/Papareddy/marchantia_hhdb_user
+- **DB on SDS** (Dagdas-lab): `/mnt/sds-hd/sd25l008/resources/marchantia_hhdb_v7.1/db_v1/marchantia_v7.1`
+- **Zenodo DOI**: to be assigned (see [docs/DOWNSTREAM_USAGE.md](docs/DOWNSTREAM_USAGE.md))
+- **Methods write-up** (paper/grant-ready): [docs/METHODOLOGY.md](docs/METHODOLOGY.md)
+- **Picking up from a fresh machine?** → [docs/HANDOFF.md](docs/HANDOFF.md)
 
 > **For users who just want to query the DB**: see the companion repo
-> `marchantia_hhdb_user/` (created post-build) — it bundles the Zenodo DOI
-> + a `Makefile` to fetch/verify + a one-line `hhsearch` wrapper. No need
-> to clone this build pipeline.
+> `marchantia_hhdb_user/`. Clone + one command. No need to clone this build pipeline.
 
 ---
 
@@ -105,15 +107,17 @@ proteome.fa → split → per-protein .fa
 
 Naive 1-job-per-protein = 54,021 SLURM jobs (over the per-user `MaxSubmitPU=1500`
 limit) AND wallclock kill risk on outliers (max protein = 9,376 AA).
-Solution: **partition by length first, then chunk**.
+Solution: **partition by length first, then chunk**. Final tier settings (v1.1 production):
 
-| Tier | length range | # proteins | proteins/batch | wall | cpu | mem |
-|---|---|---|---|---|---|---|
-| small  | <800 AA      | 15,850 (88%) | 30 | 5 h | 4 | 16 G |
-| medium | 800–1500     | 1,785 (10%)  | 10 | 6 h | 4 | 16 G |
-| large  | 1500–3000    | 326 (2%)     |  4 | 6 h | 4 | 24 G |
-| giant  | ≥3000        | 46 (0.3%)    |  1 | 4 h | 8 | 32 G |
-|        | **total batches** | | | | | **836** |
+| Tier | length range | # proteins | proteins/batch | wall | cpu | mem | per-protein timeout |
+|---|---|---|---|---|---|---|---|
+| small  | <800 AA      | 15,850 (88%) | 30 | 8 h  | 4 | 24 G | 60 min  |
+| medium | 800–1500     | 1,785 (10%)  | 10 | 24 h | 4 | 24 G | 120 min |
+| large  | 1500–3000    | 326 (2%)     |  4 | 16 h | 4 | 48 G | 180 min |
+| giant  | ≥3000        | 46 (0.3%)    |  1 | 8 h  | 8 | 64 G | 360 min |
+|        | **total batches** | | | | | | **836** |
+
+Pack stage (cstranslate over 18,007-entry a3m ffindex) uses `-c 4` threads with 96 GB memory; peak RSS was 98 GB. **More cstranslate threads = more memory** (peak ≈ 15 + 4·N GB), so increasing parallelism does NOT decrease memory pressure.
 
 Defined in `config.yaml` → `tiers:`. Computed by
 `workflow/scripts/make_batches.py` at parse time.

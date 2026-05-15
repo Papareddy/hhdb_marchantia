@@ -1,17 +1,24 @@
 # Project handoff — Marchantia HH-suite database
 
-**Use this if you're picking up this project from a fresh machine, or are a new collaborator (or Claude session) joining mid-flight.**
+**Use this if you're picking up this project from a fresh machine, or are a new collaborator (or Claude session) joining post-build.**
 
-Last updated: 2026-05-12 ~19:50 helix time, during the v1 production pack-stage debugging.
+Last updated: 2026-05-15 (post-v1.1 build, DB live on SDS).
 
 ---
 
 ## TL;DR — what state is the project in?
 
-- ✅ **Smoke test** passed (10 proteins, full pipeline, hhsearch on AtATG5 verified). DB queryable.
-- 🔄 **v1 production build** is mid-way through `pack_ffindex` (the cstranslate step). 17,567/18,007 proteins have a3m+hhm; 442 permanently failed at v1 settings (20 min timeout). Pack has failed 3× due to cstranslate being killed (cgroup OOM at 16 GB). Now running on attempt 5 with **32 GB / 8 cpus / 16 h walltime**.
-- ⏳ **v1.1 retry** with longer timeouts (30/60/90/180 min) + more memory per tier is queued behind v1: a detached watcher on helix will fire it automatically once `results/marchantia_hhdb_v7.1_build-1.tar.gz.md5` appears.
-- ⏳ **Zenodo upload** is a manual user step after both tarballs exist.
+**Production-complete.** The DB is built, validated, and queryable.
+
+- ✅ **v1.1 build complete**: 18,007 / 18,007 proteins (100 % proteome coverage)
+- ✅ **DB live on SDS**: `/mnt/sds-hd/sd25l008/resources/marchantia_hhdb_v7.1/db_v1/`
+- ✅ **Validated**: 6 conserved RQC/ribosome-rescue factors hit Marchantia at Prob=100 (PELO/HBS1L/NEMF/LTN1/ABCE1/ZNF598). Reference output bundled in companion repo.
+- ✅ **Companion repo** (`marchantia_hhdb_user`) production-ready: clone-and-run, auto-creates conda env, bundled examples.
+- ⏳ **Pending (user-driven, not autonomous)**:
+  - Send announcement email to Dagdas lab (draft in session history)
+  - Upload `archives/marchantia_hhdb_v7.1_build-1.1.tar.gz` to Zenodo (manual)
+  - Backfill Zenodo DOI into README.md, CITATION.cff (both repos), `marchantia_hhdb_user/Makefile`
+  - UniRef30 cleanup decision (informational; **never delete autonomously**)
 
 ---
 
@@ -20,15 +27,39 @@ Last updated: 2026-05-12 ~19:50 helix time, during the v1 production pack-stage 
 | Repo | Role | URL |
 |---|---|---|
 | `hhdb_marchantia` (this one) | Snakemake build pipeline | https://github.com/Papareddy/hhdb_marchantia |
-| `marchantia_hhdb_user` | End-user companion (clone + `make fetch` from Zenodo) | https://github.com/Papareddy/marchantia_hhdb_user |
+| `marchantia_hhdb_user` | End-user query wrapper (clone + run) | https://github.com/Papareddy/marchantia_hhdb_user |
 
 Active branches in `hhdb_marchantia`:
-- `main` — what's currently deployed to helix for the v1 build
-- `feature/tier-aware-timeout` — patched per-tier timeouts + memory bumps for v1.1 retry (NOT merged; pulled file-by-file via the retry workflow)
+- `main` — the final v1.1 production config
+- `feature/tier-aware-timeout` — earlier intermediate branch (merged in spirit; can be deleted)
+
+---
+
+## Where the DB lives
+
+```
+/mnt/sds-hd/sd25l008/resources/marchantia_hhdb_v7.1/
+├── archives/          ← tarball backups of both v1 (97.55 %) and v1.1 (100 %) builds
+└── db_v1/             ← canonical query target (was named db_v1.1, renamed after v1 was deleted)
+    └── marchantia_v7.1_{a3m,hhm,cs219}.{ffdata,ffindex}
+        a3m     213 GB / 18,007 entries
+        hhm     1.1 GB / 18,007 entries
+        cs219   7.4 MB / 18,007 entries
+```
+
+### Canonical env var (what users export)
+
+```
+export MARCHANTIA_HHDB=/mnt/sds-hd/sd25l008/resources/marchantia_hhdb_v7.1/db_v1/marchantia_v7.1
+```
+
+Note: the directory is named `db_v1/` (not `db_v1.1/`). When the new build superseded the original v1, the dir was renamed for cleanliness. The build provenance lives in the `archives/` tarballs.
 
 ---
 
 ## Helix workspace
+
+The pipeline source + scratch outputs still live on helix for re-runs:
 
 ```
 ssh helix
@@ -36,155 +67,101 @@ cd /gpfs/bwfor/work/ws/hd_wi353-HH_Suite_Marchantia/hhdb_marchantia
 ```
 
 Account: `bw25c013`, partition: `cpu-single`, conda module: `devel/miniforge/24.9.2`.
-QOS `normal`: `MaxSubmitPU=1500`, `MaxTRESPU=cpu=96000`. Cluster: `MaxJobCount=30000`, `MaxArraySize=1001`.
-Workspace expires 2026-06-10 (extend with `ws_extend HH_Suite_Marchantia 30` if needed).
+Workspace expires ~2026-06-10 — extend with `ws_extend HH_Suite_Marchantia 30` if needed.
 
 ---
 
-## Currently-running processes on helix (as of last handoff write)
+## How to query (the 60-second user path)
 
-Names/PIDs change; always re-check with `ps -p $(cat logs/production_run.pid)` and `pgrep -af "v1\.1 chain\|v1 stage6 watcher"`.
-
-```
-DRIVER:       snakemake driver         PID 3302626  (the production orchestrator)
-SLURM job:    pack_ffindex (attempt 5) 12982471 PD  (32 G, 8 cpu, 16 h walltime)
-WATCHER #1:   v1 Stage 6               PID 2629270  detached on helix
-              → waits for results/validation/marchantia_v7.1.integrity.ok
-              → then tars data/db/* into results/marchantia_hhdb_v7.1_build-1.tar.gz + .md5
-WATCHER #2:   v1.1 chain               PID 2345993  detached on helix
-              → waits for results/marchantia_hhdb_v7.1_build-1.tar.gz.md5
-              → then: git fetch origin feature/tier-aware-timeout, checkout config.yaml +
-                workflow/rules/batch.smk + workflow/scripts/retry_failed_batches.sh
-              → bash workflow/scripts/retry_failed_batches.sh
-              → wait for retry driver to finish
-              → tar v1.1 into results/marchantia_hhdb_v7.1_build-1.1.tar.gz + .md5
-WATCHER #3:   AtATG5 query (local ssh) bl22clgp9 (local bg task) + helix-side bash
-              → waits for all 6 ffindex files non-empty + integrity.ok
-              → runs hhsearch examples/AtATG5.fa
-              → writes examples/AtATG5.hhr
-```
-
-Local watchers (on the Mac): `b7jcg2nbh` already fired (prematurely, before integrity gate added) — its bogus zero-byte `.md5` was deleted; cleaned up. `bjx1ccqpz` (old v1.1 chain) was superseded by the detached helix-side PID 2345993 — the duplicate at helix PID 2319067 was killed.
-
----
-
-## Quick status commands
+From any bwHPC node with SDS mounted, including the helix login node:
 
 ```bash
-# Snapshot of where we are
-cd /gpfs/bwfor/work/ws/hd_wi353-HH_Suite_Marchantia/hhdb_marchantia
-ls -lh data/db/                                            # 6 ffindex files? Sizes?
-ls -lh results/                                            # tarballs?
-cat results/validation/marchantia_v7.1.integrity.ok 2>/dev/null
-squeue -u $USER -o "%.10i %.20j %.2t %.10m %.5C %.10L"     # SLURM state
-ps -p $(cat logs/production_run.pid 2>/dev/null) -o pid,etime,stat  # driver alive?
-cat logs/v1_stage6.log logs/v11_chain.log 2>/dev/null      # watchers' breadcrumbs
-tail -20 logs/production_run.log                           # driver progress
-ls -lt logs/pack/pack.20*.log 2>/dev/null | head           # per-attempt pack logs (timestamped)
+git clone https://github.com/Papareddy/marchantia_hhdb_user.git
+cd marchantia_hhdb_user
+export MARCHANTIA_HHDB=/mnt/sds-hd/sd25l008/resources/marchantia_hhdb_v7.1/db_v1/marchantia_v7.1
+./batch_query.sh examples/my_rqc_factors.fasta
 ```
 
-To count protein progress inside the running cstranslate:
-```bash
-LATEST=$(ls -t logs/pack/pack.20*.log | head -1)
-grep -c "^Processing entry:" "$LATEST"     # vs 17,567 total
-wc -l data/db/marchantia_v7.1_cs219.ffindex
-```
+First run takes ~3 min to auto-create the conda env (`mamba env create -f environment.yml` happens automatically inside `scripts/setup_env.sh`). Subsequent runs go straight to query.
 
 ---
 
-## What's expected to happen next (without any intervention)
+## Permanent rules — never violate
 
-```
-T0  now            pack 12982471 = PD, waits for SLURM scheduling
-T1  +0-15 min      pack starts running on a cpu-single node (32G/8cpu)
-T2  +5 min running ffindex_build a3m (writes 184 GB a3m.ffdata)
-T3  +6 min         ffindex_build hhm  (writes 970 MB hhm.ffdata)
-T4  +6 min - +6 h  cstranslate over a3m ffindex → cs219 (8 cpu, ~60 entries/min target)
-T5  +6 h           sort cs219 desc + reorder all 3 ffindexes
-T6  +6 h 10 min    pack done; integrity_check submitted (separate SLURM job, ~1 min)
-T7  +6 h 11 min    integrity.ok written; v1 Stage 6 watcher fires
-T8  +6 h 30 min    v1 tarball + .md5 written; v1.1 chain detects
-T9  +6 h 31 min    v1.1 chain pulls feature branch, runs retry_failed_batches.sh
-T10 +6-12 h        retry runs (smaller batches, longer per-protein timeouts)
-T11 +12-18 h       retry pack + integrity + tar
-T12                v1.1 tarball + .md5 written; you upload both to Zenodo
-```
+- **Never delete `data/reference/`**. UniRef30 (~250 GB unpacked) took >40 min to download + extract; the user explicitly marked it sacrosanct. If disk pressure arises, surface to the user — never `rm` autonomously. Memory: `feedback_no_destructive_reference_data.md`.
+- **Never retry ssh after auth failure**. bwHPC's fail2ban / rate-limit treats burst retries as a brute-force attack; the user was previously administratively suspended for this pattern. On first `ssh helix` failure ("Permission denied", "Too many authentication failures", "Connection refused"), **stop and tell the user**. Do NOT retry with different flags, alternate IPs, or `ssh-add` resets. Memory: `feedback_no_ssh_retry_spam.md`.
+- **Production submissions require explicit "go"** from the user. Autonomous resume of a previously-approved chain (after a cluster outage, etc.) is OK as long as it's clearly continuing the same approved work.
 
 ---
 
-## Failure modes + recovery (cheatsheet)
+## Non-obvious knowledge that bit us (and how to avoid)
 
-| Symptom | Most likely cause | Fix |
+Most of this is also in `docs/METHODOLOGY.md` and the `marchantia_hhdb_user` README — duplicated here as a quick reference for future-you.
+
+- **hhmake -M first/50/30 all fail** on hhblits 3.3.0 output with `"Compress"` column-count errors. Only `-M a3m` works (trusts the A3M's own match-state encoding). Hardcoded in `config.yaml`.
+- **cstranslate has NO single-file mode** — always operates on a ffindex. The pack stage runs it once over the full a3m ffindex; per-protein cstranslate is the wrong design.
+- **ffindex_build keys on the literal filename including extension** — staged symlinks renamed to bare ID (no `.a3m`/`.hhm`) before `ffindex_build` so all 3 indices share keys.
+- **snakemake's `group:` directive sums resources** — `group: msa` with 50 proteins/batch made snakemake ask 160 cpu / 312 G, instantly rejected by `cpu-single`. Removed groups; switched to a manual `batch_msa` wrapper rule.
+- **profile's `set-resources` overrides the rule's `resources:` block** — always check the profile when bumping resources for a rule.
+- **snakemake's `script:` directive treats `{...}` in COMMENTS as wildcards** — a comment like `# rename to {id}.fa` causes NameError. Use a python script via the `script:` directive (not a shell heredoc).
+- **cstranslate `-c N` is OpenMP threads, and MORE threads = MORE memory, not less.** Empirical: peak ≈ 15 GB + 4 GB × N. For an 18 k-entry DB, safe combo is `-c 4` + ≥64 GB pack mem. `-c 8` + 48 GB OOMs at ~47 GB peak. The v1.1 pack succeeded with `-c 4` + 96 GB (used 98 GB peak — bump to 128 GB next time for safety margin).
+- **Every fresh `mamba env create` or feature-branch checkout tends to silently re-introduce `cstranslate -c 4`** and reset pack mem to 32 GB. Grep `cstranslate config.yaml` and `mem_mb` in `profiles/slurm/config.yaml` after any config touch.
+- **Login-node outages kill the snakemake driver AND any detached watchers** (`nohup setsid` doesn't survive login-node restart). Running SLURM jobs continue, but no new ones get submitted from the local queue. Recovery: `snakemake --unlock` → restart driver detached → re-arm watchers.
+- **Forced kill of the snakemake driver invalidates rule metadata** (`.snakemake/incomplete/`). On resume, snakemake re-submits previously-completed rules. Because `run_batch.sh` is idempotent (skips proteins with existing `.a3m`/`.hhm`), the re-submission is wasted SLURM-submission time, not wasted CPU. Use `snakemake --touch` to skip the re-validation pass if needed.
+
+---
+
+## Failure modes + recovery cheatsheet
+
+Mostly historical now — kept here in case a future re-run hits the same walls.
+
+| Symptom | Likely cause | Fix |
 |---|---|---|
-| `cstranslate ... Killed` in `logs/pack/pack.20*.log` | cgroup OOM despite low MaxRSS (mmap-heavy program) | Bump `pack_ffindex` mem in `profiles/slurm/config.yaml`. We're at 32 G; next step is 64 G. |
-| Pack walltime hit | cstranslate slower than estimated | Bump `runtime` in profile; or bump `cpus_per_task` + matching `-c N` in `config.yaml`'s `cstranslate.flags`. |
-| `hhmake ... Compress error` | hhblits A3M edge case | Use `-M a3m` (already default in `config.yaml`). |
-| Driver dies with `Error in rule batch_msa` after 836/836 done | Race: one batch's `.done` got removed when snakemake marked it failed even though run_batch.sh completed | Manually touch the missing sentinel + restart (see "medium_0100 recovery" below). |
-| `data/db/*` got deleted by snakemake on rule failure | Snakemake removes outputs on rule failure | Per-protein `data/a3m/*.a3m` and `data/hhm/*.hhm` are preserved (different rule); pack just rebuilds the 6 ffindex files. |
+| `cstranslate ... Killed` in `logs/pack/pack.*.log` | cgroup OOM despite low MaxRSS (mmap-heavy) | Bump `pack_ffindex` mem in `profiles/slurm/config.yaml`; we ended at 96 GB. Next safe step: 128 GB. **Decrease `-c N`, don't increase** (more threads = more RAM). |
+| Pack walltime hit | cstranslate slower than estimated | Bump `runtime` in profile; current setting is 16 h (used 11.5 h in v1.1). |
+| `hhmake ... Compress error` | hhblits A3M edge case | Use `-M a3m` (already default). |
+| Driver dies with "Directory cannot be locked" | Stale `.snakemake/.lock` from a killed driver | `snakemake --unlock` then restart |
+| `Error in rule batch_msa` after 836/836 done | Race: one batch's `.done` got removed by snakemake even though run_batch.sh completed | Manually touch the missing sentinel + restart (see "medium_0100 recovery" in earlier docs) |
 
-### medium_0100-style recovery (a batch's .done missing despite the batch script completing)
+### Swap-and-restart helper
 
-```bash
-# pick the batch_id from the snakemake error
-BID=medium_0100
-# reconstruct minimal summary + failed list + sentinel
-cat > logs/batches/${BID}.summary.tsv <<EOF
-protein_id	length_aa	status	hhblits_sec	hhmake_sec	wall_sec	exit_code	reason
-EOF
-# add rows for the 2 known fails:
-echo -e "Mp4g18280.1\t1132\tFAILED\t1200\t0\t1200\t137\thhblits_oom_killed" >> logs/batches/${BID}.summary.tsv
-echo -e "Mp4g18390.1\t1057\tFAILED\t1200\t0\t1200\t137\thhblits_oom_killed" >> logs/batches/${BID}.summary.tsv
-printf "Mp4g18280.1\thhblits_oom_killed\nMp4g18390.1\thhblits_oom_killed\n" > data/batches/${BID}.failed
-touch data/batches/${BID}.done
-# then re-unlock + restart the driver
-snakemake --unlock
-nohup snakemake --profile profiles/slurm --config mode=production \
-    > logs/production_run.log 2>&1 &
-echo $! > logs/production_run.pid
-```
-
-### Swap-and-restart (pack failed mysteriously again)
-
-A helper exists:
 ```bash
 bash scripts/swap_pack_patch_and_restart.sh
 ```
-It kills any live driver, scancels pending pack jobs, wipes `data/db/*` (NOT `data/a3m/*` or `data/hhm/*`), pulls `pack.smk` + `profiles/slurm/config.yaml` from `origin/main`, unlocks, and restarts.
+
+Kills any live driver, scancels pending pack jobs, wipes `data/db/*` (NOT `data/a3m/*` or `data/hhm/*`), pulls `pack.smk` + `profiles/slurm/config.yaml` from `origin/main`, unlocks, and restarts.
 
 ---
 
 ## Picking up on a different machine
 
-1. **Clone both repos**:
+1. Clone both repos:
    ```bash
    git clone https://github.com/Papareddy/hhdb_marchantia.git
    git clone https://github.com/Papareddy/marchantia_hhdb_user.git
    cd hhdb_marchantia
    ```
-2. **Tell Claude (or whoever) to read this file first**:
-   ```
-   Read docs/HANDOFF.md and then ssh helix to check current state.
-   ```
-3. **Verify ssh access to helix works** (you'll need your bwHPC keys):
+2. Read `docs/HANDOFF.md` (this file) and `docs/METHODOLOGY.md` first.
+3. Verify SDS access (requires bwHPC keys):
    ```bash
-   ssh helix 'cd /gpfs/bwfor/work/ws/hd_wi353-HH_Suite_Marchantia/hhdb_marchantia && ls -lh data/db/ results/'
+   ssh helix 'ls -lh /mnt/sds-hd/sd25l008/resources/marchantia_hhdb_v7.1/db_v1/'
    ```
-4. **Pick the appropriate next action** based on what `ls -lh results/` shows:
-   - Empty → pack is still running or failed; check `squeue -u $USER` and `logs/production_run.log`
-   - `marchantia_hhdb_v7.1_build-1.tar.gz` only → v1 done, v1.1 retry in flight; check `logs/v11_chain.log`
-   - Both tarballs → upload to Zenodo (see `docs/DOWNSTREAM_USAGE.md` § "Zenodo upload")
-
----
-
-## Permanent rules (never violate)
-
-- **Never delete `data/reference/`**. UniRef30 took 19 min to download + 22 min to extract; the user (Ranjith) explicitly said it is sacrosanct. If disk pressure arises, surface to the user — never `rm` UniRef30 programmatically.
-- Production submissions are **gated on user "go"** in this project. Cron jobs / detached watchers running auto-pipelines are OK — destructive or compute-heavy actions still need explicit greenlight.
+   Expected: 6 files (a3m/hhm/cs219 × ffdata/ffindex), totaling ~214 GB.
+4. To re-run the build (if needed):
+   ```bash
+   ssh helix
+   cd /gpfs/bwfor/work/ws/hd_wi353-HH_Suite_Marchantia/hhdb_marchantia
+   git pull
+   conda activate hhsuite_marchantia
+   snakemake --profile profiles/slurm --config mode=production
+   ```
 
 ---
 
 ## Open questions for the user (post-v1.1)
 
-1. Pick a Zenodo metadata bundle: title, co-authors, exact CC-BY-4.0 vs CC0, etc. (Defaults in `docs/DOWNSTREAM_USAGE.md`.)
-2. Decide whether to publish v1 + v1.1 as two separate Zenodo records or v1.1 as a "new version" under the same concept-DOI (recommendation: latter).
-3. After Zenodo DOI is assigned, run a small script to backfill the DOI into: this repo's `README.md`, `CITATION.cff`, the companion repo's `README.md` and `Makefile`.
+1. **Send the Dagdas-lab announcement email** (draft is in the session that produced this handoff).
+2. **Pick a Zenodo metadata bundle**: title, co-authors, exact CC-BY-4.0 vs CC0. Defaults in `docs/DOWNSTREAM_USAGE.md`.
+3. **Zenodo upload**: publish v1.1 tarball (`archives/marchantia_hhdb_v7.1_build-1.1.tar.gz`); decide whether v1 also gets a record (recommendation: skip, v1.1 strictly supersedes it).
+4. **After Zenodo DOI is assigned**: backfill the DOI into this repo's `README.md`, `CITATION.cff`, the companion repo's `README.md` and `Makefile`.
+5. **UniRef30 cleanup**: roughly 250 GB on bwHPC scratch (`data/reference/`). User-only decision; surface, never act.
